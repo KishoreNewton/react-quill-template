@@ -107,8 +107,39 @@ async function uploadVideo(formData) {
 function BlogEditor() {
   const [editorHtml, setEditorHtml] = useState("");
 
-  function handleChange(html) {
+  function handleChange(html, delta, source, editor) {
     setEditorHtml(html);
+
+    if (source === "user") {
+      // Go through ops to find deletions
+      delta.ops.forEach((op) => {
+        if (op.delete) {
+          // Get the deleted content from the editor
+          const deletedContent = editor.getContents(op.index, op.delete);
+
+          deletedContent.ops.forEach((contentOp) => {
+            if (contentOp.insert && contentOp.insert.image) {
+              handleImageDeletion(contentOp.insert.image);
+            }
+            if (contentOp.insert && contentOp.insert.video) {
+              handleVideoDeletion(contentOp.insert.video);
+            }
+          });
+        }
+      });
+    }
+  }
+
+  // You'll want to implement these functions to handle deletions.
+  // For instance, you might send a request to your server to delete the image or video.
+  function handleImageDeletion(url) {
+    console.log(`Image deleted: ${url}`);
+    // TODO: Handle server-side deletion, if necessary
+  }
+
+  function handleVideoDeletion(url) {
+    console.log(`Video deleted: ${url}`);
+    // TODO: Handle server-side deletion, if necessary
   }
 
   return (
