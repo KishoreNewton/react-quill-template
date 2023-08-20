@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ReactQuill, { Quill } from "react-quill";
 import "react-quill/dist/quill.snow.css"; // Import styles
 
@@ -30,7 +30,7 @@ const modules = {
       ["link", "image", "video"],
 
       // Horizontal rule
-      ["divider"], // The string "divider" might differ depending on Quill's version and plugins
+      // ["divider"], // The string "divider" might differ depending on Quill's version and plugins
 
       // Inline and background color picker
       [{ color: [] }, { background: [] }],
@@ -106,44 +106,56 @@ async function uploadVideo(formData) {
 
 function BlogEditor() {
   const [editorHtml, setEditorHtml] = useState("");
+  const quillRef = useRef(null); // Create a ref to store the Quill instance
 
-  function handleChange(html, delta, source, editor) {
-    setEditorHtml(html);
-
-    if (source === "user") {
-      // Go through ops to find deletions
-      delta.ops.forEach((op) => {
-        if (op.delete) {
-          // Get the deleted content from the editor
-          const deletedContent = editor.getContents(op.index, op.delete);
-
-          deletedContent.ops.forEach((contentOp) => {
-            if (contentOp.insert && contentOp.insert.image) {
-              handleImageDeletion(contentOp.insert.image);
-            }
-            if (contentOp.insert && contentOp.insert.video) {
-              handleVideoDeletion(contentOp.insert.video);
-            }
-          });
-        }
-      });
+  useEffect(() => {
+    if (quillRef.current) {
+      quillRef.current
+        .getEditor()
+        .on("text-change", (delta, oldDelta, source) => {
+          console.log("Text changed");
+          if (
+            source === "user" &&
+            delta.ops &&
+            delta.ops.some((op) => "delete" in op)
+          ) {
+            const deletePosition =
+              oldDelta.ops.reduce(
+                (acc, op) => acc + (op.insert ? op.insert.length || 1 : 0),
+                0,
+              ) - delta.ops[0].delete;
+            const precedingContent = quillRef.current
+              .getEditor()
+              .getContents(0, deletePosition);
+            precedingContent.ops.forEach((op) => {
+              if (op.insert) {
+                if (typeof op.insert === "string") {
+                  console.log("op.insert", op.insert);
+                } else if (op.insert.image) {
+                  // Handle image deletion, e.g. remove from server
+                  console.log("Image URL that got deleted:", op.insert.image);
+                } else if (op.insert.video) {
+                  // Handle video deletion, e.g. remove from server
+                  console.log("Video URL that got deleted:", op.insert.video);
+                }
+              }
+            });
+          }
+        });
     }
-  }
+  }, []);
 
-  // You'll want to implement these functions to handle deletions.
-  // For instance, you might send a request to your server to delete the image or video.
-  function handleImageDeletion(url) {
-    console.log(`Image deleted: ${url}`);
-    // TODO: Handle server-side deletion, if necessary
-  }
-
-  function handleVideoDeletion(url) {
-    console.log(`Video deleted: ${url}`);
-    // TODO: Handle server-side deletion, if necessary
+  function handleChange(html) {
+    setEditorHtml(html);
   }
 
   return (
-    <ReactQuill value={editorHtml} onChange={handleChange} modules={modules} />
+    <ReactQuill
+      ref={quillRef}
+      value={editorHtml}
+      onChange={handleChange}
+      modules={modules}
+    />
   );
 }
 
